@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>El Botón Infinito - El Reto Global</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-firestore-compat.js"></script>
+
+    <script>
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyAm5ZpmuCzsJcY8dt4_7wOh_DGvxFEp1Cc",
+  authDomain: "infinity-clicks-f10a7.firebaseapp.com",
+  projectId: "infinity-clicks-f10a7",
+  storageBucket: "infinity-clicks-f10a7.firebasestorage.app",
+  messagingSenderId: "166809982450",
+  appId: "1:166809982450:web:966f9d7612a00b20b7476b",
+  measurementId: "G-TGHXNTDC6D"
+};
+
+        // Inicializa Firebase
+        firebase.initializeApp(firebaseConfig);
+        
+        // Referencias a los servicios
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const googleProvider = new firebase.auth.GoogleAuthProvider();
+    </script>
+    
+    <style>
+        /* Estilos CSS */
+        body {
+            background-color: #000; /* Fondo Negro */
+            color: #fff; /* Texto Blanco */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .contenedor-juego {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 50px;
+        }
+
+        h1 { font-size: 2.5em; margin-bottom: 10px; }
+        p { font-size: 1.2em; margin-bottom: 5px; }
+
+        #contador {
+            font-size: 8em; /* Marcador Grande */
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #ff0000;
+        }
+
+        #botonRojo {
+            background-color: #ff0000; /* Botón Rojo */
+            color: white;
+            border: none;
+            padding: 25px 50px;
+            font-size: 2em;
+            cursor: pointer;
+            border-radius: 10px;
+            box-shadow: 0 7px #cc0000;
+            transition: all 0.07s ease;
+            outline: none;
+        }
+
+        #botonRojo:active {
+            background-color: #e60000;
+            box-shadow: 0 3px #990000;
+            transform: translateY(4px); /* Efecto de hundimiento */
+        }
+        
+        /* Estilos del Ranking */
+        .ranking-container {
+            width: 90%;
+            max-width: 400px;
+            background-color: #1a1a1a;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .ranking-container h2 {
+            color: #00ff40;
+            margin-top: 0;
+        }
+
+        #rankingList {
+            list-style: none;
+            padding: 0;
+        }
+
+        #rankingList li {
+            background-color: #333;
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.1em;
+        }
+        
+        /* Estilos de Autenticación */
+        #auth-status {
+            margin-bottom: 20px;
+            font-size: 1.1em;
+        }
+
+        #auth-buttons button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        #auth-buttons .google { background-color: #db4437; color: white; }
+        #auth-buttons .logout { background-color: #4CAF50; color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="contenedor-juego">
+        <h1>El Reto del Botón Infinito</h1>
+        
+        <div id="auth-status">
+            <p>Por favor, inicia sesión para que tu puntaje cuente.</p>
+        </div>
+        
+        <div id="auth-buttons">
+            <button class="google" onclick="signInWithGoogle()">Iniciar con Google</button>
+            <button class="logout" onclick="signOutUser()" style="display:none;" id="logout-btn">Cerrar Sesión</button>
+        </div>
+        
+        <div id="contador">0</div>
+        
+        <button id="botonRojo" disabled>CLICK AQUÍ</button>
+        <p id="mensaje-sesion" style="color:yellow;"></p>
+    </div>
+
+    <div class="ranking-container">
+        <h2>Ranking Semanal (Top 10)</h2>
+        <ul id="rankingList">
+            <li>Cargando ranking...</li>
+        </ul>
+    </div>
+
+    <script>
+        let contadorClics = 0;
+        let esUsuarioAnonimo = true;
+
+        const contadorElemento = document.getElementById('contador');
+        const botonElemento = document.getElementById('botonRojo');
+        const authStatusElement = document.getElementById('auth-status');
+        const authButtonsElement = document.getElementById('auth-buttons');
+        const logoutButton = document.getElementById('logout-btn');
+        const mensajeSesion = document.getElementById('mensaje-sesion');
+
+        // --- FUNCIONES DE AUTENTICACIÓN (Firebase) ---
+
+        function signInWithGoogle() {
+            auth.signInWithPopup(googleProvider)
+                .catch((error) => {
+                    console.error("Error al iniciar sesión con Google:", error);
+                    alert("Error al iniciar sesión.");
+                });
+        }
+
+        function signOutUser() {
+            auth.signOut().then(() => {
+                alert("Sesión cerrada. Tu puntaje se ha guardado si era mayor al anterior.");
+            }).catch((error) => {
+                console.error("Error al cerrar sesión:", error);
+            });
+        }
+
+        // --- MANEJADOR DE ESTADO DE SESIÓN ---
+
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // Usuario logueado
+                esUsuarioAnonimo = false;
+                authStatusElement.innerHTML = `<p>¡Hola, <strong>${user.displayName || user.email.split('@')[0]}!</strong></p><p>¡A hacer clics!</p>`;
+                authButtonsElement.style.display = 'none';
+                logoutButton.style.display = 'inline-block';
+                botonElemento.disabled = false;
+                mensajeSesion.textContent = "Tu progreso se está guardando.";
+            } else {
+                // Usuario no logueado
+                esUsuarioAnonimo = true;
+                authStatusElement.innerHTML = `<p>Por favor, inicia sesión para que tu puntaje cuente.</p>`;
+                authButtonsElement.style.display = 'block';
+                logoutButton.style.display = 'none';
+                botonElemento.disabled = true;
+                mensajeSesion.textContent = "Inicia sesión para empezar a contar.";
+            }
+            cargarRankingSemanal(); 
+        });
+
+
+        // --- FUNCIÓN DEL JUEGO ---
+
+        function manejarClic() {
+            if (esUsuarioAnonimo) {
+                alert("Debes iniciar sesión para empezar a contar tus clics en el marcador global.");
+                return;
+            }
+            contadorClics++;
+            // Formato de miles para números grandes (ej: 1,000,000)
+            contadorElemento.textContent = contadorClics.toLocaleString(); 
+        }
+
+        botonElemento.addEventListener('click', manejarClic);
+
+        // --- GUARDAR PUNTAJE (Transacción segura a Firestore) ---
+        
+        function guardarPuntaje(puntaje) {
+            const user = auth.currentUser;
+            if (user && puntaje > 0) {
+                // Usamos el ID del usuario como el ID del documento para fácil consulta
+                const docRef = db.collection("puntajes_semanales").doc(user.uid);
+                
+                db.runTransaction(transaction => {
+                    return transaction.get(docRef).then(doc => {
+                        if (!doc.exists || doc.data().puntaje < puntaje) {
+                            // Guarda el puntaje solo si es la primera vez o si el nuevo es mayor
+                            transaction.set(docRef, {
+                                usuarioId: user.uid,
+                                nombre: user.displayName || user.email.split('@')[0],
+                                puntaje: puntaje,
+                                fecha: firebase.firestore.FieldValue.serverTimestamp() // Fecha del servidor
+                            });
+                        }
+                    });
+                }).then(() => {
+                    console.log("Puntaje guardado o actualizado exitosamente.");
+                    // Reiniciar contador después de guardar
+                    contadorClics = 0;
+                    contadorElemento.textContent = 0;
+                }).catch(error => {
+                    console.error("Fallo la transacción de guardado: ", error);
+                });
+            }
+        }
+
+        // Guardar automáticamente al cerrar el navegador o al cerrar sesión
+        window.addEventListener('beforeunload', () => guardarPuntaje(contadorClics)); 
+        logoutButton.addEventListener('click', () => guardarPuntaje(contadorClics));
+
+
+        // --- FUNCIÓN DE RANKING GLOBAL ---
+
+        function cargarRankingSemanal() {
+            const rankingList = document.getElementById('rankingList');
+            rankingList.innerHTML = '<li>Cargando...</li>';
+            
+            // Calculamos la fecha de hace 7 días
+            const unaSemanaAtras = new Date();
+            unaSemanaAtras.setDate(unaSemanaAtras.getDate() - 7);
+            
+            db.collection("puntajes_semanales")
+                .where("fecha", ">=", unaSemanaAtras) // Filtra por la última semana
+                .orderBy("puntaje", "desc")         // Ordena del más alto al más bajo
+                .limit(10)                          // Muestra solo el Top 10
+                .get()
+                .then(snapshot => {
+                    rankingList.innerHTML = ''; // Limpiar lista
+                    if (snapshot.empty) {
+                        rankingList.innerHTML = '<li>Nadie ha jugado esta semana. ¡Sé el primero!</li>';
+                        return;
+                    }
+                    
+                    let count = 1;
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        const li = document.createElement('li');
+                        li.innerHTML = `<strong>#${count}</strong> - ${data.nombre} <span>${data.puntaje.toLocaleString()} CLICS</span>`;
+                        rankingList.appendChild(li);
+                        count++;
+                    });
+                })
+                .catch(error => {
+                    console.error("Error al cargar el ranking: ", error);
+                    rankingList.innerHTML = '<li>Error al cargar el ranking.</li>';
+                });
+        }
+        
+        // Cargar el ranking al iniciar
+        cargarRankingSemanal();
+        // Opcional: Recargar el ranking cada 30 segundos
+        setInterval(cargarRankingSemanal, 30000); 
+
+    </script>
+
+</body>
+</html>
